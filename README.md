@@ -1,0 +1,1 @@
+# Roboshop-Ansible-Roles-Variables
