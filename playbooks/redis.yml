@@ -1,5 +1,0 @@
-- name: Redis (Valkey) Setup – Rocky Linux 10
-  hosts: redis
-  become: true
-  roles:
-    - redis

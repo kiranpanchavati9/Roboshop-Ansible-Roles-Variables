@@ -1,5 +1,0 @@
-- name: Cart Service Setup (Rocky Linux 10)
-  hosts: cart
-  become: true
-  roles:
-    - cart

@@ -1,6 +1,8 @@
 - name: Roboshop Project Setup
   hosts: "{{ target_hosts }}"
   become: true
+  vars:
+    mysql_root_password: RoboShop@1
   tasks:
     - name: Run selected component role
       include_role:
