@@ -1,0 +1,54 @@
+- name: Install required packages
+  ansible.builtin.dnf:
+    name:
+      - python3
+      - gcc
+      - python3-devel
+      - unzip
+    state: present
+
+- name: Ensure roboshop user exists
+  ansible.builtin.user:
+    name: roboshop
+
+- name: Copy payment systemd service file
+  ansible.builtin.copy:
+    src: payment.service
+    dest: /etc/systemd/system/payment.service
+    mode: '0644'
+
+- name: Create /app directory
+  ansible.builtin.file:
+    path: /app
+    state: directory
+    owner: roboshop
+    group: roboshop
+
+- name: Download payment artifact
+  ansible.builtin.get_url:
+    url: https://roboshop-artifacts.s3.amazonaws.com/payment-v3.zip
+    dest: /tmp/payment.zip
+    mode: '0644'
+
+- name: Extract payment artifact
+  ansible.builtin.unarchive:
+    src: /tmp/payment.zip
+    dest: /app
+    remote_src: yes
+    owner: roboshop
+    group: roboshop
+
+- name: Install Python dependencies
+  ansible.builtin.pip:
+    requirements: /app/requirements.txt
+    executable: pip3
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Enable and restart payment service
+  ansible.builtin.service:
+    name: payment
+    state: restarted
+    enabled: yes

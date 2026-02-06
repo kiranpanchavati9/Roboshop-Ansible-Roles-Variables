@@ -1,0 +1,5 @@
+- name: Payment Service Setup
+  hosts: payment
+  become: true
+  roles:
+    - payment

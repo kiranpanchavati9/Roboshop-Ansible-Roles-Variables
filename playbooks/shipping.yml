@@ -1,0 +1,5 @@
+- name: Shipping Service Setup
+  hosts: shipping
+  become: true
+  roles:
+    - shipping

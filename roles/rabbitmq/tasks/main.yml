@@ -1,0 +1,26 @@
+- name: Copy RabbitMQ repository file
+  ansible.builtin.copy:
+    src: /root/Ansible/Ansible-RoboShop-V1/rabbitmq.repo
+    dest: /etc/yum.repos.d/rabbitmq.repo
+    mode: '0644'
+
+- name: Install RabbitMQ server
+  ansible.builtin.dnf:
+    name: rabbitmq-server
+    state: present
+
+- name: Enable and start RabbitMQ service
+  ansible.builtin.systemd:
+    name: rabbitmq-server
+    enabled: yes
+    state: started
+
+- name: Add roboshop user to RabbitMQ
+  ansible.builtin.command: rabbitmqctl add_user roboshop roboshop123
+  register: add_user_result
+  failed_when:
+    - add_user_result.rc != 0
+    - "'already exists' not in add_user_result.stderr"
+
+- name: Set permissions for roboshop user
+  ansible.builtin.command: rabbitmqctl set_permissions -p / roboshop ".*" ".*" ".*"

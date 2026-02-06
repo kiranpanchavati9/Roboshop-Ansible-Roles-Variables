@@ -1,0 +1,84 @@
+# ---------------- REPOSITORY SETUP ----------------
+- name: Copy MongoDB repo file
+  ansible.builtin.copy:
+    src: mongo.repo
+    dest: /etc/yum.repos.d/mongodb.repo
+
+# ---------------- System prerequisites ----------------
+- name: Install NodeJS
+  ansible.builtin.dnf:
+    name: nodejs
+    state: present
+
+- name: Install unzip
+  ansible.builtin.dnf:
+    name: unzip
+    state: present
+
+- name: Install MongoDB Shell (mongosh)
+  ansible.builtin.dnf:
+    name: mongodb-mongosh
+    state: present
+
+# ---------------- Application user ----------------
+- name: Create roboshop user
+  ansible.builtin.user:
+    name: roboshop
+    create_home: yes
+
+# ---------------- Service configuration ----------------
+- name: Copy Catalogue service file
+  ansible.builtin.copy:
+    src: catalogue.service
+    dest: /etc/systemd/system/catalogue.service
+
+# ---------------- Application setup ----------------
+- name: Create /app directory
+  ansible.builtin.file:
+    path: /app
+    state: directory
+
+- name: Download and extract Catalogue code
+  ansible.builtin.unarchive:
+    src: https://roboshop-artifacts.s3.amazonaws.com/catalogue-v3.zip
+    dest: /app
+    remote_src: yes
+
+- name: Fix ownership of /app directory
+  ansible.builtin.file:
+    path: /app
+    owner: roboshop
+    group: roboshop
+    recurse: yes
+
+- name: Install NodeJS dependencies
+  ansible.builtin.command: npm install
+  args:
+    chdir: /app
+  become_user: roboshop
+
+# ---------------- MongoDB data initialization ----------------
+- name: Check if catalogue data already exists
+  ansible.builtin.command: >
+    mongosh --host mongod-dev.kiranpanchavati.online 
+    --quiet --eval "db.getSiblingDB('catalogue').products.countDocuments()"
+  register: catalogue_count
+  changed_when: false
+  ignore_errors: yes
+
+- name: Load catalogue master data
+  ansible.builtin.command: >
+    mongosh --host mongod-dev.kiranpanchavati.online 
+    < /app/db/master-data.js
+  when: catalogue_count.stdout is defined and catalogue_count.stdout | int == 0
+
+# ---------------- Service handling ----------------
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Enable & restart Catalogue service
+  ansible.builtin.systemd:
+    name: catalogue
+    state: restarted
+    enabled: yes

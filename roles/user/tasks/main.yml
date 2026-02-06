@@ -1,0 +1,94 @@
+####################################################################
+# 1. Install NodeJS 20 (NodeSource)
+####################################################################
+- name: Add NodeSource NodeJS 20 repository
+  ansible.builtin.shell: |
+    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+  args:
+    creates: /etc/yum.repos.d/nodesource-nodejs.repo
+
+####################################################################
+# 2. Add MongoDB repository (GPG disabled due to Rocky 10 crypto)
+####################################################################
+- name: Add MongoDB repository (Rocky 10 workaround)
+  ansible.builtin.copy:
+    dest: /etc/yum.repos.d/mongodb-org.repo
+    content: |
+      [mongodb-org-7.0]
+      name=MongoDB Repository
+      baseurl=https://repo.mongodb.org/yum/redhat/9/mongodb-org/7.0/x86_64/
+      enabled=1
+      gpgcheck=0
+
+####################################################################
+# 3. Install required packages
+####################################################################
+- name: Install NodeJS, unzip, and mongosh
+  ansible.builtin.dnf:
+    name:
+      - nodejs
+      - unzip
+      - mongodb-mongosh
+    state: present
+
+####################################################################
+# 4. Create roboshop user
+####################################################################
+- name: Create roboshop user
+  ansible.builtin.user:
+    name: roboshop
+    create_home: yes
+
+####################################################################
+# 5. Copy User service file
+####################################################################
+- name: Copy User systemd service file
+  ansible.builtin.copy:
+    src: user.service
+    dest: /etc/systemd/system/user.service
+
+####################################################################
+# 6. Create /app directory
+####################################################################
+- name: Create /app directory
+  ansible.builtin.file:
+    path: /app
+    state: directory
+    owner: roboshop
+    group: roboshop
+
+####################################################################
+# 7. Download and extract User application
+####################################################################
+- name: Download and extract User application code
+  ansible.builtin.unarchive:
+    src: https://roboshop-artifacts.s3.amazonaws.com/user-v3.zip
+    dest: /app
+    remote_src: yes
+    owner: roboshop
+    group: roboshop
+
+####################################################################
+# 8. Install NodeJS dependencies
+####################################################################
+- name: Install NodeJS dependencies
+  ansible.builtin.command: npm install
+  args:
+    chdir: /app
+  become_user: roboshop
+
+####################################################################
+# 9. Reload systemd
+####################################################################
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+####################################################################
+# 10. Enable and restart User service
+####################################################################
+- name: Enable and restart User service
+  ansible.builtin.systemd:
+    name: user
+    state: restarted
+    enabled: yes

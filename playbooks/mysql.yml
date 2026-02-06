@@ -1,0 +1,7 @@
+- name: MySQL Server Setup
+  hosts: mysql
+  become: true
+  vars:
+    mysql_root_password: "RoboShop@1"
+  roles:
+    - mysql

@@ -1,0 +1,33 @@
+- name: Enable CRB repository
+  ansible.builtin.command: dnf config-manager --set-enabled crb
+
+- name: Install EPEL release
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+
+- name: Clean dnf cache
+  ansible.builtin.command: dnf clean all
+
+- name: Install Valkey (Redis replacement)
+  ansible.builtin.dnf:
+    name: valkey
+    state: present
+
+- name: Configure Valkey bind address
+  ansible.builtin.replace:
+    path: /etc/valkey/valkey.conf
+    regexp: '^bind .*'
+    replace: 'bind 0.0.0.0'
+
+- name: Disable protected mode
+  ansible.builtin.replace:
+    path: /etc/valkey/valkey.conf
+    regexp: '^protected-mode yes'
+    replace: 'protected-mode no'
+
+- name: Enable and restart Valkey service
+  ansible.builtin.systemd:
+    name: valkey
+    state: restarted
+    enabled: yes

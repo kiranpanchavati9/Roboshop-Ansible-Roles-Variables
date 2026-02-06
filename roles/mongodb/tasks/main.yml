@@ -1,0 +1,23 @@
+- name: Copy MongoDB repo file
+  ansible.builtin.copy:
+    src: mongo.repo
+    dest: /etc/yum.repos.d/mongo.repo
+    mode: '0644'
+
+- name: Install MongoDB (Server + Shell)
+  ansible.builtin.dnf:
+    name: mongodb-org
+    state: present
+
+- name: Configure MongoDB to allow remote access
+  ansible.builtin.lineinfile:
+    path: /etc/mongod.conf
+    regexp: '^  bindIp:'
+    line: '  bindIp: 0.0.0.0'
+    backrefs: no
+
+- name: Start and enable MongoDB
+  ansible.builtin.service:
+    name: mongod
+    state: started
+    enabled: yes

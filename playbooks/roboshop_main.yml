@@ -1,0 +1,7 @@
+- name: Roboshop Project Setup
+  hosts: "{{ target_hosts }}"
+  become: true
+  tasks:
+    - name: Run selected component role
+      include_role:
+        name: "{{ component }}"

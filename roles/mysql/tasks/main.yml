@@ -1,0 +1,27 @@
+- name: Install MySQL Server
+  ansible.builtin.dnf:
+    name: mysql-server
+    state: present
+
+- name: Enable MySQL service
+  ansible.builtin.service:
+    name: mysqld
+    enabled: yes
+
+- name: Start MySQL service
+  ansible.builtin.service:
+    name: mysqld
+    state: started
+
+- name: Set MySQL root password and authentication plugin
+  ansible.builtin.shell: |
+    mysql -uroot -p{{ mysql_root_password }} <<EOF
+    ALTER USER 'root'@'localhost'
+    IDENTIFIED WITH mysql_native_password BY '{{ mysql_root_password }}';
+    FLUSH PRIVILEGES;
+    EOF
+  args:
+    executable: /bin/bash
+  register: mysql_password_change
+  failed_when: false
+  changed_when: false

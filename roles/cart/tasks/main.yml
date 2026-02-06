@@ -1,0 +1,77 @@
+####################################################################
+# 1. Install NodeJS 20 (NodeSource – REQUIRED on Rocky 10)
+####################################################################
+- name: Add NodeSource NodeJS 20 repository
+  ansible.builtin.shell: |
+    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+  args:
+    creates: /etc/yum.repos.d/nodesource-nodejs.repo
+
+- name: Install NodeJS and unzip
+  ansible.builtin.dnf:
+    name:
+      - nodejs
+      - unzip
+    state: present
+
+####################################################################
+# 2. Create roboshop user
+####################################################################
+- name: Create roboshop user
+  ansible.builtin.user:
+    name: roboshop
+    create_home: yes
+
+####################################################################
+# 3. Copy Cart systemd service file
+####################################################################
+- name: Copy Cart systemd service file
+  ansible.builtin.copy:
+    src: cart.service
+    dest: /etc/systemd/system/cart.service
+
+####################################################################
+# 4. Create /app directory
+####################################################################
+- name: Create /app directory
+  ansible.builtin.file:
+    path: /app
+    state: directory
+    owner: roboshop
+    group: roboshop
+
+####################################################################
+# 5. Download and extract Cart application
+####################################################################
+- name: Download and extract Cart application code
+  ansible.builtin.unarchive:
+    src: https://roboshop-artifacts.s3.amazonaws.com/cart-v3.zip
+    dest: /app
+    remote_src: yes
+    owner: roboshop
+    group: roboshop
+
+####################################################################
+# 6. Install NodeJS dependencies
+####################################################################
+- name: Install NodeJS dependencies
+  ansible.builtin.command: npm install
+  args:
+    chdir: /app
+  become_user: roboshop
+
+####################################################################
+# 7. Reload systemd
+####################################################################
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+####################################################################
+# 8. Enable and restart Cart service
+####################################################################
+- name: Enable and restart Cart service
+  ansible.builtin.systemd:
+    name: cart
+    state: restarted
+    enabled: yes

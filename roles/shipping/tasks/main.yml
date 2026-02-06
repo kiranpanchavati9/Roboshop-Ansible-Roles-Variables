@@ -1,0 +1,94 @@
+- name: Install required packages
+  ansible.builtin.dnf:
+    name:
+      - maven
+      - unzip
+      - mysql
+    state: present
+
+- name: Ensure roboshop user exists
+  ansible.builtin.user:
+    name: roboshop
+
+- name: Copy shipping systemd service file
+  ansible.builtin.copy:
+    src: shipping.service
+    dest: /etc/systemd/system/shipping.service
+    mode: '0644'
+
+- name: Create /app directory
+  ansible.builtin.file:
+    path: /app
+    state: directory
+    owner: roboshop
+    group: roboshop
+
+- name: Download shipping artifact
+  ansible.builtin.get_url:
+    url: https://roboshop-artifacts.s3.amazonaws.com/shipping-v3.zip
+    dest: /tmp/shipping.zip
+    mode: '0644'
+
+- name: Extract shipping artifact
+  ansible.builtin.unarchive:
+    src: /tmp/shipping.zip
+    dest: /app
+    remote_src: yes
+    owner: roboshop
+    group: roboshop
+
+- name: Build shipping application using Maven
+  ansible.builtin.command: mvn clean package
+  args:
+    chdir: /app
+  become_user: roboshop
+
+- name: Rename shipping jar
+  ansible.builtin.command: mv target/shipping-1.0.jar shipping.jar
+  args:
+    chdir: /app
+  become_user: roboshop
+
+- name: Wait for MySQL to be reachable
+  ansible.builtin.wait_for:
+    host: mysql-dev.kiranpanchavati.online
+    port: 3306
+    timeout: 60
+
+# ---------------- DB OPERATIONS ----------------
+
+- name: Load DB schema (run as roboshop)
+  ansible.builtin.shell: |
+    mysql -h mysql-dev.kiranpanchavati.online -uroboshop -pRoboShop@1 < /app/db/schema.sql
+  args:
+    executable: /bin/bash
+
+- name: Read app-user.sql from shipping
+  ansible.builtin.slurp:
+    src: /app/db/app-user.sql
+  register: app_user_sql
+
+- name: Run app-user.sql locally on MySQL server as root
+  ansible.builtin.shell: |
+    mysql -uroot -pRoboShop@1 <<< "{{ app_user_sql.content | b64decode }}"
+  args:
+    executable: /bin/bash
+  delegate_to: mysql-dev.kiranpanchavati.online
+
+- name: Load master data (run as roboshop)
+  ansible.builtin.shell: |
+    mysql -h mysql-dev.kiranpanchavati.online -uroboshop -pRoboShop@1 < /app/db/master-data.sql
+  args:
+    executable: /bin/bash
+
+# ---------------- SERVICE ----------------
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Enable and restart shipping service
+  ansible.builtin.service:
+    name: shipping
+    state: restarted
+    enabled: yes
